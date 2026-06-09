@@ -1,122 +1,108 @@
-from tkinter import *
-from tkinter import messagebox
-import tempfile
-import os
-import subprocess  # Needed for Mac printing
+import streamlit as st
 
-root = Tk()
-root.title('Billing Management System')
-root.geometry('1280x720')
-bg_color = '#2D9290'
+# Set Page Title and Configuration
+st.set_page_config(page_title="Billing Management System", layout="wide")
 
-# =====================variables===================
-Pizza = IntVar()
-Burger = IntVar()
-Patties = IntVar()
-ColdCoffee = IntVar()
-Total = IntVar()
+st.title("🍔 Billing Management System")
 
-cp = StringVar()
-cb = StringVar()
-cr = StringVar()
-cc = StringVar()
-total_cost = StringVar()
+# ===================== Prices Configuration ===================
+PRICES = {
+    "Pizza": 149,
+    "Burger": 79,
+    "Patties": 35,
+    "Cold Coffee": 49
+}
 
-# ===========Function===============
-def total():
-    if Pizza.get() == 0 and Burger.get() == 0 and Patties.get() == 0 and ColdCoffee.get() == 0:
-        messagebox.showerror('Error', 'Please select number of quantity')
-    else:
-        p, b, pa, cc_val = Pizza.get(), Burger.get(), Patties.get(), ColdCoffee.get()
+# Use Streamlit Session State to persist the generated receipt layout
+if "receipt_text" not in st.session_state:
+    st.session_state.receipt_text = ""
 
-        t = float(p * 149 + b * 79 + pa * 35 + cc_val * 49)
-        Total.set(p + b + pa + cc_val)
-        total_cost.set(f'₹ {round(t, 2)}')
+# Layout: Split page into 2 interactive columns
+col1, col2 = st.columns([2, 1])
 
-        cp.set(f'₹ {p * 149}')
-        cb.set(f'₹ {b * 79}')
-        cr.set(f'₹ {pa * 35}')
-        cc.set(f'₹ {cc_val * 49}')
-
-def receipt():
-    textarea.delete(1.0, END)
-    textarea.insert(END, ' Items\t\tQty\tCost\n')
-    textarea.insert(END, '='*35 + '\n')
-
-    if Pizza.get() > 0:
-        textarea.insert(END, f'Pizza\t\t{Pizza.get()}\t{cp.get()}\n')
-    if Burger.get() > 0:
-        textarea.insert(END, f'Burger\t\t{Burger.get()}\t{cb.get()}\n')
-    if Patties.get() > 0:
-        textarea.insert(END, f'Patties\t\t{Patties.get()}\t{cr.get()}\n')
-    if ColdCoffee.get() > 0:
-        textarea.insert(END, f'Coffee\t\t{ColdCoffee.get()}\t{cc.get()}\n')
-
-    textarea.insert(END, f"\n" + "="*35)
-    textarea.insert(END, f'\nTotal Items:\t{Total.get()}')
-    textarea.insert(END, f'\nTotal Price:\t\t{total_cost.get()}')
-    textarea.insert(END, f"\n" + "="*35)
-
-def print_receipt():
-    content = textarea.get('1.0', 'end-1c')
-    if not content.strip():
-        messagebox.showerror('Error', 'No receipt to print!')
-        return
+with col1:
+    st.header("🛒 Product Details")
     
-    # Using a safer way to create a temp file
-    fd, path = tempfile.mkstemp(suffix=".txt")
-    try:
-        with os.fdopen(fd, 'w') as tmp:
-            tmp.write(content)
-        
-        # macOS specific print command
-        subprocess.run(['lpr', path]) 
-        messagebox.showinfo('Success', 'Receipt sent to printer!')
-    finally:
-        # Keep the file or delete it after printing
-        pass
+    # Input section mimicking your table grid
+    # Users can change quantities directly with numerical plus/minus selectors
+    pizza_qty = st.number_input("Pizza Quantity (₹149/each)", min_value=0, value=0, step=1)
+    burger_qty = st.number_input("Burger Quantity (₹79/each)", min_value=0, value=0, step=1)
+    patties_qty = st.number_input("Patties Quantity (₹35/each)", min_value=0, value=0, step=1)
+    coffee_qty = st.number_input("Cold Coffee Quantity (₹49/each)", min_value=0, value=0, step=1)
 
-def reset():
-    textarea.delete(1.0, END)
-    for var in [Pizza, Burger, Patties, ColdCoffee, Total]: var.set(0)
-    for var in [cp, cb, cr, cc, total_cost]: var.set('')
+    st.markdown("---")
+    
+    # Live Subtotal Display before printing receipts
+    t_pizza = pizza_qty * PRICES["Pizza"]
+    t_burger = burger_qty * PRICES["Burger"]
+    t_patties = patties_qty * PRICES["Patties"]
+    t_coffee = coffee_qty * PRICES["Cold Coffee"]
+    
+    total_items = pizza_qty + burger_qty + patties_qty + coffee_qty
+    total_cash = t_pizza + t_burger + t_patties + t_coffee
 
-def exit_app():
-    if messagebox.askyesno('Exit', 'Do you really want to exit?'):
-        root.destroy()
+    # Display real-time costs right inside your input panel
+    st.subheader("💰 Live Item Cost Summary")
+    st.write(f"**Pizza Cost:** ₹{t_pizza}")
+    st.write(f"**Burger Cost:** ₹{t_burger}")
+    st.write(f"**Patties Cost:** ₹{t_patties}")
+    st.write(f"**Cold Coffee Cost:** ₹{t_coffee}")
+    st.write(f"### **Total Amount:** ₹{total_cash:.2f}")
 
-# ================= UI Elements =================
-title = Label(root, pady=5, text="Billing Management System", bd=12, bg=bg_color, fg='white', font=('times new roman', 35, 'bold'), relief=GROOVE)
-title.pack(fill=X)
+    # Action Buttons Panel
+    st.subheader("⚙️ Control Panel")
+    btn_col1, btn_col2, btn_col3 = st.columns(3)
+    
+    with btn_col1:
+        if st.button("📄 Generate Receipt", use_container_width=True, type="primary"):
+            if total_items == 0:
+                st.error("Error: Please select number of quantity first!")
+            else:
+                # Formatting textual receipt like your legacy text area
+                receipt = " Items\t\tQty\tCost\n"
+                receipt += "=" * 35 + "\n"
+                
+                if pizza_qty > 0:
+                    receipt += f"Pizza\t\t{pizza_qty}\t₹ {t_pizza}\n"
+                if burger_qty > 0:
+                    receipt += f"Burger\t\t{burger_qty}\t₹ {t_burger}\n"
+                if patties_qty > 0:
+                    receipt += f"Patties\t\t{patties_qty}\t₹ {t_patties}\n"
+                if coffee_qty > 0:
+                    receipt += f"Coffee\t\t{coffee_qty}\t₹ {t_coffee}\n"
+                    
+                receipt += "\n" + "=" * 35
+                receipt += f"\nTotal Items:\t{total_items}"
+                receipt += f"\nTotal Price:\t\t₹ {total_cash:.2f}"
+                receipt += "\n" + "=" * 35
+                
+                st.session_state.receipt_text = receipt
+                st.toast("Receipt Generated!", icon="✅")
 
-F1 = LabelFrame(root, text='Product Details', font=('times new roman', 18, 'bold'), fg='gold', bg=bg_color, bd=15, relief=RIDGE)
-F1.place(x=5, y=90, width=800, height=500)
+    with btn_col2:
+        if st.button("🔄 Reset Fields", use_container_width=True):
+            st.session_state.receipt_text = ""
+            # Streamlit resets numerical form states globally when page component reruns
+            st.rerun()
 
-# Labels
-headers = ["Items", "Quantity", "Cost"]
-for i, h in enumerate(headers):
-    Label(F1, text=h, font=('Helvetica', 20, 'bold', 'underline'), fg='black', bg=bg_color).grid(row=0, column=i, padx=20, pady=15)
+    with btn_col3:
+        # Web platforms do not have access to client local printers for safety.
+        # Added a download button so the user can save the text bill instead!
+        if st.session_state.receipt_text:
+            st.download_button(
+                label="💾 Save/Download Bill",
+                data=st.session_state.receipt_text,
+                file_name="bill_receipt.txt",
+                mime="text/plain",
+                use_container_width=True
+            )
+        else:
+            st.button("💾 Save/Download Bill", disabled=True, use_container_width=True)
 
-# Product Rows (Condensed for brevity)
-products = [('Pizza', Pizza, cp), ('Burger', Burger, cb), ('Patties', Patties, cr), ('Cold Coffee', ColdCoffee, cc), ('Total', Total, total_cost)]
-for i, (name, var_qty, var_cost) in enumerate(products, 1):
-    Label(F1, text=name, font=('times new roman', 20, 'bold'), fg='lawngreen', bg=bg_color).grid(row=i, column=0, padx=20, pady=15)
-    Entry(F1, font='arial 15 bold', bd=7, textvariable=var_qty, width=12).grid(row=i, column=1, padx=20)
-    Entry(F1, font='arial 15 bold', bd=7, textvariable=var_cost, width=12).grid(row=i, column=2, padx=20)
-
-# Bill Area
-F2 = Frame(root, relief=GROOVE, bd=10)
-F2.place(x=820, y=90, width=430, height=500)
-Label(F2, text='Receipt', font='arial 15 bold', bd=7, relief=GROOVE).pack(fill=X)
-textarea = Text(F2, font='arial 15')
-textarea.pack(fill=BOTH, expand=True)
-
-# Buttons
-F3 = Frame(root, bg=bg_color, bd=15, relief=RIDGE)
-F3.place(x=5, y=590, width=1270, height=120)
-
-btns = [('Total', total), ('Receipt', receipt), ('Print', print_receipt), ('Reset', reset), ('Exit', exit_app)]
-for i, (txt, cmd) in enumerate(btns):
-    Button(F3, text=txt, font='arial 20 bold', fg='red', width=9, command=cmd).grid(row=0, column=i, padx=12, pady=15)
-
-root.mainloop()
+with col2:
+    st.header("📋 Receipt Preview")
+    if st.session_state.receipt_text:
+        # Preformatted block displays tabular layout cleanly without alignment breakage
+        st.code(st.session_state.receipt_text, language="text")
+    else:
+        st.info("Your generated bill receipt output will show up right here.")
